@@ -1,0 +1,106 @@
+#!/bin/bash
+
+wbhe_log_file=/var/log/bash_history.log
+inotifywait_path=$(type -p inotifywait)
+Download_url=
+Inotify_Download_url=http://cloud.github.com/downloads/rvoicilas/inotify-tools/inotify-tools-3.14.tar.gz
+Message_Repeat="message repeated"
+Changed_File="Changed the file"
+
+function exception_check()
+{
+        if [ $? -eq 0 ]
+        then
+                if [ -z $1 ]
+                then
+                        echo "done"
+                fi
+        else
+                echo "above task return code "$?
+                echo "something wrong"
+                exit 1
+        fi
+}
+
+function update ()
+{
+        if [ $(ps -ef | grep -v grep | grep $dstat_path |wc -l) -eq 0 ]
+        then
+                curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# $Download_url?$(date +%s) -o /tmp/wbhe_agent;
+                exception_check quiet
+                if [ "$(md5sum /tmp/wbhe_agent | awk '{print $1}')" != "$(md5sum $wbhe_agent_path | awk '{print $1}')" ]
+                then
+                        chmod +x /tmp/wbhe_agent
+                        exception_check quiet
+                        mv -f /tmp/wbhe_agent $wbhe_agent_path
+                        exception_check quiet
+                        echo "update done"
+                else
+                        rm -rf /tmp/wbhe_agent
+                        echo "wbhe_agent already up to date"
+                fi
+        else
+                echo "wbhe_agent runnig"
+        fi
+}
+
+# inotify-tools installation check and install
+if [ -z $inotifywait_path ]
+then
+	echo "need to inotify-tools package"
+	echo "install inotify-tools"
+        rpm_path=$(type -p rpm)
+        dpkg_path=$(type -p dpkg)
+        if [ -e "$rpm_path" ]
+        then
+		curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# $inotify_Download_url?$(date +%s) -o /tmp/inotify-tools-3.14.tar.gz
+		exception_check
+		tar -zxvf  /tmp/inotify-tools-3.14.tar.gz
+		exception_check
+		cd /tmp/inotify-tools-3.14
+		exception_check
+		./configure
+		exception_check
+		make
+		exception_check
+		make install
+		exception_check
+		updatedb
+                exception_check
+        elif [ -e $dpkg_path ]
+        then
+                apt-get install -y inotify-tools
+                exception_check
+        else
+                echo "Can't install inotify-tools package"
+		exit 0
+        fi
+fi
+
+
+while $inotifywait_path -e modify $wbhe_log_file
+do
+	Last_Message=$(tail -n1 $wbhe_log_file)
+	if [ $(echo $Last_Message | grep "$Message_Repeat" | wc -l ) -eq 1  ]
+	then
+		echo "Repeated Message"
+	else
+		if [ $(echo $Last_Message | grep "vi" | wc -l) -eq 1 ]
+		then
+			Changed_Message=$(tail -n2 $wbhe_log_file | head -n 1)
+			if [ $(echo $Changed_Message | grep "$Changed_File" | wc -l ) -eq 1 ]
+			then
+				echo "#################### Changed file checked ##############################"
+				echo $Last_Message" :: "$Changed_Message
+				echo "#################### Changed file checked ##############################"
+			fi
+		elif [ $(echo $Last_Message | grep "$Changed_File" | wc -l ) -eq 1 ]
+		then
+			echo "Changed file message. will be dropped"
+		else
+			echo "#################################################################################################"
+			echo $Last_Message
+			echo "#################################################################################################"
+		fi
+        fi
+done
