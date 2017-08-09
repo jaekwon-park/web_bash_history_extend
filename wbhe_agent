@@ -1,7 +1,7 @@
 #!/bin/bash
 
 WBHE_LOG_FILE=/var/log/bash_history.log
-WBHE_AGENT_PATH=/usr/local/bin/
+WBHE_AGENT_PATH=/usr/local/bin/wbhe_agent
 INOTIFYWAIT_PATH=$(type -p inotifywait)
 DOWNLOAD_URL=https://raw.githubusercontent.com/jaekwon-park/web_bash_history_extend/master/wbhe_agent
 INOTIFY_DOWNLOAD_URL=http://cloud.github.com/downloads/rvoicilas/inotify-tools/inotify-tools-3.14.tar.gz
@@ -51,7 +51,7 @@ function exception_check() {
 }
 
 function update() {
-  if [ $(ps -ef | grep -v grep | grep wbhe_agent | wc -l) -eq 0 ]; then
+  if [ $(ps -ef | grep -v grep | grep "wbhe_agent run" | wc -l) -eq 0 ]; then
     curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# $DOWNLOAD_URL?$(date +%s) -o /tmp/wbhe_agent
     exception_check quiet
     if [ "$(md5sum /tmp/wbhe_agent | awk '{print $1}')" != "$(md5sum $WBHE_AGENT_PATH | awk '{print $1}')" ]; then
@@ -119,13 +119,13 @@ function run::message_parse() {
     LOG_DAY=$(echo $ORIGINAL_MESSAGE | awk '{print $2}')
     LOG_TIME=$(echo $ORIGINAL_MESSAGE | awk '{print $3}')
     NODE_NAME=$(echo $ORIGINAL_MESSAGE | awk '{print $4}')
-    LOGIN_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $5}' | sed 's/://')
+    LOGIN_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $5}' | sed "s/://")
     USER_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $6}')
     CONNECT_IP=$(echo $ORIGINAL_MESSAGE | awk '{print $7}')
-    SHELL_PID=$(echo $ORIGINAL_MESSAGE | awk '{print $8}' | sed 's/[//' | sed 's/]//')
-    EXCUTE_PATH=$(echo $ORIGINAL_MESSAGE | awk '{print $9}' | sed 's/[//' | sed 's/]//')
-    RUN_COMMAND=$(echo $ORIGINAL_MESSAGE | awk -F]: '{print $2}' | awk '{print $1}' | sed 's/^ *//')
-    RUN_RESULT=$(echo $ORIGINAL_MESSAGE | awk '{print $NF}' | sed 's/[//' | sed 's/]//')
+    SHELL_PID=$(echo $ORIGINAL_MESSAGE | awk '{print $8}' | sed "s/[//" | sed "s/]//")
+    EXCUTE_PATH=$(echo $ORIGINAL_MESSAGE | awk '{print $9}' | sed "s/[//" | sed "s/]//")
+    RUN_COMMAND=$(echo $ORIGINAL_MESSAGE | awk -F]: '{print $2}' | awk '{print $1}' | sed "s/^ *//")
+    RUN_RESULT=$(echo $ORIGINAL_MESSAGE | awk '{print $NF}' | sed "s/[//" | sed "s/]//")
     ;;
   type2)
     ORIGINAL_MESSAGE=$2
