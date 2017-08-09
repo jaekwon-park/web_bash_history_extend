@@ -83,7 +83,7 @@ function stop() {
 }
 function check_tools() {
   # inotify-tools installation check and install
-  if [ -z $INOTIFYWAIT_PATH ]; then
+  if [[ -z $INOTIFYWAIT_PATH ]]; then
     echo "need to inotify-tools package"
     echo "install inotify-tools"
     RPM_PATH=$(type -p rpm)
@@ -119,13 +119,13 @@ function run::message_parse() {
     LOG_DAY=$(echo $ORIGINAL_MESSAGE | awk '{print $2}')
     LOG_TIME=$(echo $ORIGINAL_MESSAGE | awk '{print $3}')
     NODE_NAME=$(echo $ORIGINAL_MESSAGE | awk '{print $4}')
-    LOGIN_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $5}' | sed -e 's/://')
+    LOGIN_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $5}' | sed 's/://')
     USER_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $6}')
     CONNECT_IP=$(echo $ORIGINAL_MESSAGE | awk '{print $7}')
-    SHELL_PID=$(echo $ORIGINAL_MESSAGE | awk '{print $8}' | sed -e 's/[//' | sed -e 's/]//')
-    EXCUTE_PATH=$(echo $ORIGINAL_MESSAGE | awk '{print $9}' | sed -e 's/[//' | sed -e 's/]//')
+    SHELL_PID=$(echo $ORIGINAL_MESSAGE | awk '{print $8}' | sed 's/[//' | sed 's/]//')
+    EXCUTE_PATH=$(echo $ORIGINAL_MESSAGE | awk '{print $9}' | sed 's/[//' | sed 's/]//')
     RUN_COMMAND=$(echo $ORIGINAL_MESSAGE | awk -F]: '{print $2}' | awk '{print $1}' | sed 's/^ *//')
-    RUN_RESULT=$(echo $ORIGINAL_MESSAGE | awk '{print $NF}' | sed -e 's/[//' | sed -e 's/]//')
+    RUN_RESULT=$(echo $ORIGINAL_MESSAGE | awk '{print $NF}' | sed 's/[//' | sed 's/]//')
     ;;
   type2)
     ORIGINAL_MESSAGE=$2
@@ -139,10 +139,10 @@ function run() {
   while $INOTIFYWAIT_PATH -e modify $WBHE_LOG_FILE; do
     LAST_MESSAGE=$(tail -n1 $WBHE_LOG_FILE)
     run::message_parse type1 $LAST_MESSAGE
-    if [ $(echo $LAST_MESSAGE | grep "$CHANGED_FILE_FILTER" | wc -l) -eq 1]; then
+    if [ $(echo $LAST_MESSAGE | grep "$CHANGED_FILE_FILTER" | wc -l) -eq 1 ]; then
       run::message_parse type2 $LAST_MESSAGE
       cat $CHANGE_FILE_NAME >>$CHANGE_FILE_STORE
-        SEND_MESSAGE=""
+      SEND_MESSAGE=""
     elif [ $(echo $RUN_COMMAND | grep "^vi*  " | wc -l) -eq 1 ]; then
       CHECK_CHANGE_FILENAME=$(tail -n2 $WBHE_LOG_FILE | head -n 1 | grep "$CHANGED_FILE_FILTER")
       if [ $(echo $CHECK_CHANGE_FILENAME | wc -l) -eq 1 ]; then
@@ -150,7 +150,7 @@ function run() {
         CHANGE_FILE_HASH=$(md5sum $CHANGE_FILE_NAME | awk '{print $1}')
         SEND_MESSAGE=$(echo $LOG_MONTH :: $LOG_DAY :: $LOG_TIME :: $NODE_NAME :: $LOGIN_ID :: $USER_ID :: $CONNECT_IP :: $SHELL_PID :: $EXCUTE_PATH :: $RUN_COMMAND :: $RUN_RESULT :: $CHANGE_FILE_HASH)
         #upload /tmp/$CHANGE_FILE_STORE with $CHANGE_FILE_HASH
-        echo "" > $CHANGE_FILE_STORE
+        echo "" >$CHANGE_FILE_STORE
       fi
     else
       if [ $(echo $LAST_MESSAGE | grep "$MESSAGE_REPEAT_FILTER" | wc -l) -eq 0 ]; then
@@ -160,12 +160,12 @@ function run() {
       fi
     fi
 
-  if [ -z $SEND_MESSAGE ]; then
-    echo "#################################################################################################"
-    curl -X PUT $WBHE_SERVER_URL   -H "cache-control: no-cache"   -H "content-type: application/x-www-form-urlencoded" -H "x-api-key: $X_API_KEY" -d "log=$SEND_MESSAGE"
-    echo $SEND_MESSAGEE
-    echo "#################################################################################################"
-  fi
+    if [[ -e $SEND_MESSAGE ]]; then
+      echo "#################################################################################################"
+      curl -X PUT $WBHE_SERVER_URL -H "cache-control: no-cache" -H "content-type: application/x-www-form-urlencoded" -H "x-api-key: $X_API_KEY" -d "log=$SEND_MESSAGE"
+      echo $SEND_MESSAGEE
+      echo "#################################################################################################"
+    fi
   done
 }
 
@@ -176,7 +176,7 @@ case "$COMMAND" in
 run)
   check_tools
   #run daemon
-  run >/dev/null &
+  run &
   exception_check
   ;;
 stop)
