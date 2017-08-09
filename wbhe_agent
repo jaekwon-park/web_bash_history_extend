@@ -119,13 +119,13 @@ function run::message_parse() {
     LOG_DAY=$(echo $ORIGINAL_MESSAGE | awk '{print $2}')
     LOG_TIME=$(echo $ORIGINAL_MESSAGE | awk '{print $3}')
     NODE_NAME=$(echo $ORIGINAL_MESSAGE | awk '{print $4}')
-    LOGIN_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $5}' | sed "s/://")
+    LOGIN_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $5}' | sed "s/\://")
     USER_ID=$(echo $ORIGINAL_MESSAGE | awk '{print $6}')
     CONNECT_IP=$(echo $ORIGINAL_MESSAGE | awk '{print $7}')
-    SHELL_PID=$(echo $ORIGINAL_MESSAGE | awk '{print $8}' | sed "s/[//" | sed "s/]//")
-    EXCUTE_PATH=$(echo $ORIGINAL_MESSAGE | awk '{print $9}' | sed "s/[//" | sed "s/]//")
-    RUN_COMMAND=$(echo $ORIGINAL_MESSAGE | awk -F]: '{print $2}' | awk '{print $1}' | sed "s/^ *//")
-    RUN_RESULT=$(echo $ORIGINAL_MESSAGE | awk '{print $NF}' | sed "s/[//" | sed "s/]//")
+    SHELL_PID=$(echo $ORIGINAL_MESSAGE | awk '{print $8}' | sed "s/\[//" | sed "s/\]//")
+    EXCUTE_PATH=$(echo $ORIGINAL_MESSAGE | awk '{print $9}' | sed "s/\[//" | sed "s/\]//")
+    RUN_RESULT=$(echo $ORIGINAL_MESSAGE | awk '{print $NF}' | sed "s/\[//" | sed "s/\]//")
+    RUN_COMMAND=$(echo $ORIGINAL_MESSAGE | awk -F]: '{print $2}' | sed "s/^ *//" | sed "s/\[$RUN_RESULT\]//" )
     ;;
   type2)
     ORIGINAL_MESSAGE=$2
