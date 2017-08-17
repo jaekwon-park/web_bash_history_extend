@@ -9,7 +9,9 @@ WBHE_SERVER_URL=http://wbhe.ddb.infra.farm/api/v1/log
 WBHE_SERVER_UPLOAD_URL=http://wbhe.ddb.infra.farm/api/v1/log/upload
 X_API_KEY="48ocss0844swwgos8gcggc40wgsggo848wkoow4c1"
 MESSAGE_REPEAT_FILTER="message repeated"
-CHANGED_FILE_FILTER="Changed the file"
+CHANGED_FILE_FILTER="Changed_the_file"
+CHANGE_FILE_STORE="$(mktemp /tmp/wbhe.XXXXXXXXXX)"
+CHANGE_FILE_STATUS="$(mktemp /tmp/wbhe.XXXXXXXXXX)"
 
 #PARSED_OPTION=$(getopt -n "$0" -o u:k: --long "url:,keyset:" -- "$@")
 #if [ $? -ne 0 ]; then
@@ -41,17 +43,17 @@ COMMAND=$1
 shift
 
 #######################################
-# Exception Check for Every command 
+# Exception Check for Every command
 #
 # Arguments:
-#   excuted command 
+#   excuted command
 # Returns:
 #   None or exit 1
 #
 #######################################
 function exception_check() {
-#  if [ "$?" -eq 0 ]; then
-  if ! "$@" ; then
+  if [ "$?" -eq 0 ]; then
+#  if ! "$@" ; then
       echo "done" > /dev/null
   else
     echo "above task return code "$?
@@ -74,10 +76,13 @@ function update() {
 #if [ "$(ps -ef | grep -v grep | grep "wbhe_agent run" | wc -l)" -eq 0 ]; then
   if [[ "$(pgrep -f "wbhe_agent run" | wc -l)" -eq 0 ]]; then
 #curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# "$DOWNLOAD_URL"?"$(date +%s)" -o /tmp/wbhe_agent
-    exception_check curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# "$DOWNLOAD_URL"?"$(date +%s)" -o /tmp/wbhe_agent
+    curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# "$DOWNLOAD_URL"?"$(date +%s)" -o /tmp/wbhe_agent
+    exception_check
     if [ "$(md5sum /tmp/wbhe_agent | awk '{print $1}')" != "$(md5sum $WBHE_AGENT_PATH | awk '{print $1}')" ]; then
-      exception_check chmod +x /tmp/wbhe_agent
-      exception_check mv -f /tmp/wbhe_agent $WBHE_AGENT_PATH
+      chmod +x /tmp/wbhe_agent
+      exception_check
+      mv -f /tmp/wbhe_agent $WBHE_AGENT_PATH
+      exception_check
       echo "update done"
     else
       rm -rf /tmp/wbhe_agent
@@ -100,13 +105,15 @@ function update() {
 #######################################
 function stop() {
 #  if [ $(ps -ef | grep -v grep | grep wbhe_agent | wc -l) -ne 0 ]; then
-  if [[ "$(pgrep -f wbhe_agent | wc -l)" -ne 0 ]]; then
+  if [[ "$(pgrep -f "wbhe_agent run" | wc -l)" -ne 0 ]]; then
 #PID="$(ps -ef | grep -v grep | grep wbhe_agent | awk '{print $2}')"
-    pid="$(pgrep -ff wbhe_agent)"
-    echo "wbhe_agent running pid $pid"
-    echo "Try stop wbhe_agent"
-#    kill -9 $PID
-    exception_check kill -9 "$pid"
+    local pid
+    for pid in "$(pgrep -f "wbhe_agent run")"; do
+      echo "wbhe_agent running pid : $pid"
+      echo "Try stop wbhe_agent"
+      kill -9 "$pid"
+      exception_check
+    done
   else
     echo "can't find wbhe_agent process"
     exit 0
@@ -133,14 +140,21 @@ function check_tools() {
     rpm_path="$(type -p rpm)"
     dpkg_path="$(type -p dpkg)"
     if [[ -e "$rpm_path" ]]; then
-      exception_check curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# "$INOTIFY_DOWNLOAD_URL"?"$(date +%s)" -o /tmp/inotify-tools-3.14.tar.gz
-      exception_check tar -zxvf /tmp/inotify-tools-3.14.tar.gz -C /tmp/
-      exception_check cd /tmp/inotify-tools-3.14
-      exception_check ./configure
-      exception_check make
-      exception_check make install
+      curl -w ' [:: %{size_download} byte has been downloaded ::]\n' -L -# "$INOTIFY_DOWNLOAD_URL"?"$(date +%s)" -o /tmp/inotify-tools-3.14.tar.gz
+      exception_check
+      tar -zxvf /tmp/inotify-tools-3.14.tar.gz -C /tmp/
+      exception_check
+      cd /tmp/inotify-tools-3.14
+      exception_check
+      ./configure
+      exception_check
+      make
+      exception_check
+      make install
+      exception_check
     elif [[ -e "$dpkg_path" ]]; then
-      exception_check apt-get install -y inotify-tools
+      apt-get install -y inotify-tools
+      exception_check
     else
       echo "Can't install inotify-tools package"
       exit 0
@@ -160,28 +174,26 @@ function check_tools() {
 function run::message_parse() {
   original_log_message=("$@")
   if [[ "$(echo "${original_log_message[@]}" | grep -c "$CHANGED_FILE_FILTER" )" -eq 0 ]]; then
-    logging_month=$(echo "${original_log_message[@]}" | awk '{print $1}')
-    logging_day=$(echo "${original_log_message[@]}" | awk '{print $2}')
-    logging_time=$(echo "${original_log_message[@]}" | awk '{print $3}')
-    node_name=$(echo "${original_log_message[@]}" | awk '{print $4}')
-    login_id=$(echo "${original_log_message[@]}" | awk '{print $5}' | sed "s/\://")
-    executed_id=$(echo "${original_log_message[@]}" | awk '{print $6}')
-    connect_ip=$(echo "${original_log_message[@]}" | awk '{print $7}')
-    shell_pid=$(echo "${original_log_message[@]}" | awk '{print $8}' | sed "s/\[//" | sed "s/\]//")
-    executed_path=$(echo "${original_log_message[@]}" | awk '{print $9}' | sed "s/\[//" | sed "s/\]//")
-    running_result=$(echo "${original_log_message[@]}" | awk '{print $NF}' | sed "s/\[//" | sed "s/\]//")
-    running_command=$(echo "${original_log_message[@]}" | awk -F]: '{print $2}' | sed "s/\[$running_result\]//")
-    editor_check=$(echo "$running_command" | awk '{print $1}')
-    #    echo "########################################## editor check #####################################"
-    #    echo $editor_check
-    #    echo "##########################################################################################"
+    logging_month="$(echo "${original_log_message[@]}" | awk '{print $1}')"
+    logging_day="$(echo "${original_log_message[@]}" | awk '{print $2}')"
+    logging_time="$(echo "${original_log_message[@]}" | awk '{print $3}')"
+    node_name="$(echo "${original_log_message[@]}" | awk '{print $4}')"
+    login_id="$(echo "${original_log_message[@]}" | awk '{print $5}' | sed "s/\://")"
+    executed_id="$(echo "${original_log_message[@]}" | awk '{print $6}')"
+    connect_ip="$(echo "${original_log_message[@]}" | awk '{print $7}')"
+    shell_pid="$(echo "${original_log_message[@]}" | awk '{print $8}' | sed "s/\[//" | sed "s/\]//")"
+    executed_path="$(echo "${original_log_message[@]}" | awk '{print $9}' | sed "s/\[//" | sed "s/\]//")"
+    running_result="$(echo "${original_log_message[@]}" | awk '{print $NF}' | sed "s/\[//" | sed "s/\]//")"
+    running_command="$(echo "${original_log_message[@]}" | awk -F]: '{print $2}' | sed "s/\[$running_result\]//")"
+    editor_check="$(echo "$running_command" | awk '{print $1}')"
   else
-    changed_file_name=$(echo "${original_log_message[@]}" | awk '{print $NF}')
+    changed_file_name="$(echo "${original_log_message[@]}" | awk '{print $NF}')"
+    shell_pid="$(echo "${original_log_message[@]}" | awk '{print $8}' | sed "s/\[//" | sed "s/\]//")"
   fi
 }
 
 #######################################
-# message send to wbhe server 
+# message send to wbhe server
 #
 # Arguments:
 #   None
@@ -192,23 +204,37 @@ function run::message_parse() {
 function run::send_message() {
   last_log_message="$(tail -n1 $WBHE_LOG_FILE)"
   run::message_parse "$last_log_message"
+  if [[ ! -e "$CHANGE_FILE_STORE"."$shell_pid" ]]; then
+    touch "$CHANGE_FILE_STORE"."$shell_pid"
+  fi
+  if [[ ! -e "$CHANGE_FILE_STATUS"."$shell_pid" ]]; then
+    touch "$CHANGE_FILE_STATUS"."$shell_pid"
+  fi
   if [[ "$(echo "$last_log_message" | grep  -c "$CHANGED_FILE_FILTER")" -eq 1 ]]; then
-    cat "$changed_file_name" >> "$CHANGE_FILE_STORE"
-    send_message=""
+    if [[ -z "$(cat "$CHANGE_FILE_STATUS"."$shell_pid")" ]]; then
+      cat "$changed_file_name" > "$CHANGE_FILE_STORE"."$shell_pid"
+      send_message=""
+      echo "changed" > "$CHANGE_FILE_STATUS"."$shell_pid"
+    else
+      cat "$changed_file_name" >> "$CHANGE_FILE_STORE"."$shell_pid"
+      send_message=""
+    fi
   elif [ "$editor_check" == "vi" ] || [ "$editor_check" == "vim" ]; then
     check_changed_filename="$(tail -n2 $WBHE_LOG_FILE | head -n 1)"
     if [[ "$(echo "$check_changed_filename" | grep  -c "$CHANGED_FILE_FILTER" )" -eq 1 ]]; then
       run::message_parse "$check_changed_filename"
       changed_file_hash_result="$(md5sum "$changed_file_name" | awk '{print $1}')"
-      send_message="$("$logging_month :: $logging_day :: $logging_time :: $node_name :: $login_id :: $executed_id :: $connect_ip :: $shell_pid :: $executed_path :: $running_command :: $running_result :: $changed_file_hash_result")"
+      send_message="$(echo "$logging_month :: $logging_day :: $logging_time :: $node_name :: $login_id :: $executed_id :: $connect_ip :: $shell_pid :: $executed_path :: $running_command :: $running_result :: $changed_file_hash_result")"
       curl -X POST "$WBHE_SERVER_URL" -H "cache-control: no-cache" -H "content-type: application/x-www-form-urlencoded" -H "x-api-key: $X_API_KEY" -d "log=$send_message" 2>/dev/null &
-      curl -X POST "$WBHE_SERVER_UPLOAD_URL" -H "cache-control: no-cache" -H "content-type: multipart/form-data" -H "x-api-key: $X_API_KEY" -F md5="$changed_file_hash_result" -F filedata=@"$CHANGE_FILE_STORE" 2>/dev/null &
-      echo "" > "$CHANGE_FILE_STORE"
+      sleep 15
+      curl -X POST "$WBHE_SERVER_UPLOAD_URL" -H "cache-control: no-cache" -H "content-type: multipart/form-data" -H "x-api-key: $X_API_KEY" -F md5="$changed_file_hash_result" -F filedata=@"$CHANGE_FILE_STORE"."$shell_pid" 2>/dev/null &
+      cat "$CHANGE_FILE_STORE"."$shell_pid"
+      echo "" > "$CHANGE_FILE_STATUS"."$shell_pid"
       send_message=""
     fi
   else
     if [[ "$(echo "$last_log_message" | grep -c "$MESSAGE_REPEAT_FILTER")" -eq 0 ]]; then
-      send_message="$("$logging_month :: $logging_day :: $logging_time :: $node_name :: $login_id :: $executed_id :: $connect_ip :: $shell_pid :: $executed_path :: $running_command :: $running_result ::")"
+      send_message="$(echo "$logging_month :: $logging_day :: $logging_time :: $node_name :: $login_id :: $executed_id :: $connect_ip :: $shell_pid :: $executed_path :: $running_command :: $running_result ::")"
     else
       send_message=""
     fi
@@ -231,9 +257,8 @@ function run::send_message() {
 #
 #######################################
 function run() {
-  CHANGE_FILE_STORE=/tmp/filediff.tmp
   while $INOTIFYWAIT_PATH -e modify $WBHE_LOG_FILE; do
-    bg run::send_message 
+   run::send_message &
   done
 }
 
@@ -241,7 +266,7 @@ case "$COMMAND" in
 run)
   check_tools
   #run daemon
-  run >/dev/null 2>&1 &
+  run # >/dev/null 2>&1 &
   ;;
 stop)
   stop
