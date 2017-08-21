@@ -180,6 +180,9 @@ function run::message_parse() {
     running_result="$(echo "${original_log_message[@]}" | awk '{print $NF}' | sed "s/\[//" | sed "s/\]//")"
     running_command="$(echo "${original_log_message[@]}" | awk -F]: '{print $2}' | sed "s/\[$running_result\]//")"
     editor_check="$(echo "$running_command" | awk '{print $1}')"
+    if [[ $editor_check == "sudo" ]]; then
+      editor_check="$(echo "$running_command" | awk '{print $2}')"
+    fi
   else
     changed_file_name="$(echo "${original_log_message[@]}" | awk '{print $NF}')"
     shell_pid="$(echo "${original_log_message[@]}" | awk '{print $8}' | sed "s/\[//" | sed "s/\]//")"
