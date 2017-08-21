@@ -185,7 +185,8 @@ function run::message_parse() {
     fi
   else
     changed_file_name="$(echo "${original_log_message[@]}" | awk '{print $NF}')"
-    shell_pid="$(echo "${original_log_message[@]}" | awk '{print $8}' | sed "s/\[//" | sed "s/\]//")"
+    #shell_pid="$(echo "${original_log_message[@]}" | awk '{print $8}' | sed "s/\[//" | sed "s/\]//")"
+    shell_pid="$(echo "${original_log_message[@]}" | awk -F: '{print $4}' | awk '{print $NF}' | sed "s/\[//" | sed "s/\]//")"
   fi
 }
 
@@ -263,7 +264,7 @@ case "$COMMAND" in
 run)
   check_tools
   #run daemon
-  run # >/dev/null 2>&1 &
+  run  >/dev/null 2>&1 &
   ;;
 stop)
   stop
